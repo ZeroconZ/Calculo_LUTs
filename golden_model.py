@@ -24,6 +24,13 @@ def saturate_q412(val):
         return int(val)
 
 
+@app.function
+def to_c2_16bits(val):
+    if val < 0:
+        return 65536 + val
+    return val
+
+
 @app.cell
 def _():
     print("="*60)
@@ -31,12 +38,20 @@ def _():
     print("="*60)
 
     print("\n--- Parámetros del Controlador ---")
-    K  = float(input("K: "))
-    b  = float(input("b: "))
-    Ti = float(input("Ti: "))
-    Td = float(input("Td: "))
-    N  = float(input("N: "))
-    T  = float(input("T: "))
+
+    # K  = float(input("K: "))
+    # b  = float(input("b: "))
+    # Ti = float(input("Ti: "))
+    # Td = float(input("Td: "))
+    # N  = float(input("N: "))
+    # T  = float(input("T: "))
+
+    K  = 1
+    b  = 1
+    Ti = 999999999
+    Td = 0
+    N  = 1
+    T  = 0.2
 
     coef_I  = (K * T) / Ti
     coef_D1 = Td / (Td + N * T)
@@ -47,7 +62,7 @@ def _():
     I_prev  = 0.0
     D_prev  = 0.0
 
-    ciclos = int(input("\n Número de ciclos"))
+    ciclos = int(input("\nNúmero de ciclos: "))
 
     print("\n" + "="*60)
     for k in range(1, ciclos + 1):
@@ -56,12 +71,9 @@ def _():
         y  = float(input(f"Y para k={k} : "))
 
         P_float = K * (b * uc - y)
-
         I_inc_float = coef_I * (uc_prev - y_prev)
         I_float = I_prev + I_inc_float
-
         D_float = coef_D1 * D_prev - coef_D2 * (y - y_prev)
-
 
         P_q412 = saturate_q412(round(P_float * 4096))
         I_q412 = saturate_q412(round(I_float * 4096))
@@ -69,15 +81,19 @@ def _():
 
         PID_final_q412 = P_q412 + I_q412 + D_q412
 
-        print("\n  --- Resultados Q4.12 (Para comparar con FPGA) ---")
-        print(f"  P(k)  = {P_q412}")
-        print(f"  I(k)  = {I_q412}")
-        print(f"  D(k)  = {D_q412}")
+        print("\n  --- Resultados Q4.12 (Enteros con signo) ---")
+        print(f"  P(k)  = {P_q412 & 0xFFFF}")
+        print(f"  I(k)  = {I_q412 & 0xFFFF}")
+        print(f"  D(k)  = {D_q412 & 0xFFFF}")
         print(f"  -----------------------")
-        print(f"  U(k) Final = {PID_final_q412}")
+        print(f"  U(k) Final = {PID_final_q412 & 0xFFFF}")
 
-        if PID_final_q412 > 32767 or PID_final_q412 < -32768:
-            print("  ⚠️ ALERTA: ¡La suma final ha desbordado los 16 bits!")
+        # CORRECCIÓN 2: Mostrar el valor equivalente en C2 para comparar con ModelSim
+        print("\n  --- Equivalente en C2 (Para comparar directamente con la FPGA) ---")
+        print(f"  U(k) en C2 = {to_c2_16bits(PID_final_q412)}")
+
+        if P_q412 + I_q412 + D_q412 > 32767 or P_q412 + I_q412 + D_q412 < -32768:
+            print("  ⚠️ ALERTA: Se ha activado la saturación por desbordamiento en el sumador.")
 
         uc_prev = uc
         y_prev  = y
