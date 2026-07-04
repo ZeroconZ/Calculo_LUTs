@@ -48,8 +48,8 @@ def _():
 
     K  = 1
     b  = 1
-    Ti = 999999999
-    Td = 0
+    Ti = 2
+    Td = 1
     N  = 1
     T  = 0.2
 
@@ -73,10 +73,16 @@ def _():
         P_float = K * (b * uc - y)
         I_inc_float = coef_I * (uc_prev - y_prev)
         I_float = I_prev + I_inc_float
-        D_float = coef_D1 * D_prev - coef_D2 * (y - y_prev)
+        D1_float = coef_D1 * D_prev 
+        D2_float = - coef_D2 * (y - y_prev)
+
+        D_float = D1_float + D2_float
 
         P_q412 = saturate_q412(round(P_float * 4096))
         I_q412 = saturate_q412(round(I_float * 4096))
+        D1_q412 = saturate_q412(round(D1_float * 4096))
+        D2_q412 = saturate_q412(round(D2_float * 4096))
+
         D_q412 = saturate_q412(round(D_float * 4096))
 
         PID_final_q412 = P_q412 + I_q412 + D_q412
@@ -84,16 +90,14 @@ def _():
         print("\n  --- Resultados Q4.12 (Enteros con signo) ---")
         print(f"  P(k)  = {P_q412 & 0xFFFF}")
         print(f"  I(k)  = {I_q412 & 0xFFFF}")
+        print(f"  D1(k)  = {D1_q412 & 0xFFFF}")
+        print(f"  D2(k)  = {D2_q412 & 0xFFFF}")
         print(f"  D(k)  = {D_q412 & 0xFFFF}")
         print(f"  -----------------------")
         print(f"  U(k) Final = {PID_final_q412 & 0xFFFF}")
 
-        # CORRECCIÓN 2: Mostrar el valor equivalente en C2 para comparar con ModelSim
-        print("\n  --- Equivalente en C2 (Para comparar directamente con la FPGA) ---")
-        print(f"  U(k) en C2 = {to_c2_16bits(PID_final_q412)}")
-
         if P_q412 + I_q412 + D_q412 > 32767 or P_q412 + I_q412 + D_q412 < -32768:
-            print("  ⚠️ ALERTA: Se ha activado la saturación por desbordamiento en el sumador.")
+            print("La salida del PID ha saturado")
 
         uc_prev = uc
         y_prev  = y
